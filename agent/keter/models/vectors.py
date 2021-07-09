@@ -1,6 +1,7 @@
 from uuid import uuid4
 from typing import Sequence, Generator
 from multiprocessing import cpu_count
+import selfies
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from gensim.matutils import corpus2dense
 from sklearn.feature_extraction.text import CountVectorizer
@@ -11,6 +12,13 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 import pandas as pd
 from keter.operations import generate_smiles2lang
+
+
+def smiles2selfies(smiles_list):
+    for smiles in smiles_list:
+        selfie = selfies.encoder(smiles)
+        if selfie:
+            yield selfie.replace("[", " [").lstrip()
 
 
 class _WrapGenerator:
@@ -91,13 +99,11 @@ class ChemicalLanguageModule:
         self, smiles_seq: Sequence[str], training: bool = False
     ) -> _WrapGenerator:
         return _WrapGenerator(
-            lambda: self._smiles_to_advanced_lang(
-                generate_smiles2lang(smiles_seq), training
-            )
+            lambda: self._smiles_to_advanced_lang(smiles2selfies(smiles_seq), training)
         )
 
     def make_generator(self, X):
-        return self._smiles_to_advanced_lang(generate_smiles2lang(X))
+        return self._smiles_to_advanced_lang(smiles2selfies(X))
 
     def to_vecs(self, X: Sequence[str]) -> np.ndarray:
         if self.hyperparams.vector_algo == "lda":
@@ -129,7 +135,7 @@ class ChemicalLanguageModule:
             token_pattern="[a-zA-Z0-9$&+,:;=?@_/~#\\[\\]|<>.^*()%!-]+",
         )
 
-        X_vec = cv.fit_transform(generate_smiles2lang(X))
+        X_vec = cv.fit_transform(smiles2selfies(X))
 
         local_vocab = set()
         for feat in Y.columns:
